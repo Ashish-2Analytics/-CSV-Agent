@@ -1,7 +1,7 @@
 <div align="center">
 
 <!-- TYPING ANIMATION HEADER -->
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=32&duration=3000&pause=1000&color=00E5A0&center=true&vCenter=true&width=600&lines=📊+CSV+Agent;Chat+with+your+Data;Powered+by+Groq+%2B+LangChain;No+Code.+Just+Questions." alt="Typing SVG" />
+<img src="Screenshot (64).png" alt="CSV Agent Banner" width="100%"/>
 
 <br/>
 
@@ -224,12 +224,10 @@ This project is licensed under the **MIT License** — feel free to use, modify,
 
 ## 👨‍💻 Developer
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&duration=2000&pause=1000&color=00E5A0&center=true&vCenter=true&width=400&lines=Built+with+❤️+by+Ashish+Aptel;AI+%7C+Data+Science+%7C+Web+Dev" alt="Developer" />
+# **Ashish Patel**
 
-**Ashish Aptel**
-
-[![GitHub](https://img.shields.io/badge/GitHub-ashishaptel-181717?style=for-the-badge&logo=github)](https://github.com/ashishaptel)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Ashish_Aptel-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/ashishaptel)
+[![GitHub](https://img.shields.io/badge/GitHub-Ashish_Patel-181717?style=for-the-badge&logo=github)]([https://github.com/ashishaptel](https://github.com/Ashish-2Analytics))
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Ashish_Patel-0A66C2?style=for-the-badge&logo=linkedin)](www.linkedin.com/in/ashish-patel-data24)
 
 <br/>
 
