@@ -1,0 +1,29 @@
+# ─────────────────────────────────────────────
+#  CSV Agent — Requirements
+#  Frontend: HTML + CSS (no install needed)
+#  Backend dependencies listed below
+# ─────────────────────────────────────────────
+
+# LangChain core framework
+langchain>=1.2.14
+
+# Experimental agents (create_csv_agent)
+langchain-experimental>=0.4.1
+
+# Groq LLM integration for LangChain
+langchain-groq>=1.1.2
+
+# LangChain community tools
+langchain-community>=0.4.1
+
+# Data analysis and manipulation
+pandas>=3.0.2
+
+# Table formatting in terminal
+tabulate>=0.10.0
+
+# Environment variable management
+python-dotenv>=1.1.0
+
+# HTTP requests
+requests>=2.32.5

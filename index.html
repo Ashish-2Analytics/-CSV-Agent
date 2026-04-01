@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CSV Agent — AI Data Chat</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      <div class="logo-text">CSV <span>Agent</span></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- API Key -->
+    <div>
+      <div class="section-label">Groq API Key</div>
+      <label for="apiKey">Your Groq API Key</label>
+      <input type="password" id="apiKey" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" autocomplete="off"/>
+    </div>
+
+    <!-- Model -->
+    <div>
+      <label for="modelSelect">Model</label>
+      <select id="modelSelect">
+        <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+        <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+        <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+        <option value="gemma2-9b-it">gemma2-9b-it</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- CSV Upload -->
+    <div>
+      <div class="section-label">Data Source</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="csvFile" accept=".csv"/>
+        <div class="upload-icon">🗂️</div>
+        <div class="upload-text">
+          <strong>Click or drag</strong> to upload<br/>
+          CSV files only
+        </div>
+      </div>
+      <div class="file-info" id="fileInfo">
+        <span>📄</span>
+        <span class="file-name" id="fileName"></span>
+        <span class="file-remove" id="fileRemove" title="Remove file">✕</span>
+      </div>
+    </div>
+
+    <!-- CSV Preview -->
+    <div class="preview-box" id="previewBox"></div>
+
+    <!-- Connect -->
+    <button class="btn-connect" id="connectBtn" disabled>Connect Agent</button>
+
+    <!-- Status -->
+    <div class="status-badge" id="statusBadge">
+      <div class="status-dot"></div>
+      <span id="statusText">Not connected — upload CSV & enter API key</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Quick prompts -->
+    <div>
+      <div class="section-label">Quick Prompts</div>
+      <div style="display:flex;flex-direction:column;gap:6px;" id="quickPrompts">
+        <div class="quick-prompt">📋 Show the first 5 rows of the data</div>
+        <div class="quick-prompt">📊 What columns are in this dataset?</div>
+        <div class="quick-prompt">📈 Give me summary statistics</div>
+        <div class="quick-prompt">❓ How many rows and columns are there?</div>
+        <div class="quick-prompt">🔍 Are there any missing values?</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN ─── -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Chat with your CSV</div>
+        <div class="topbar-sub" id="topbarSub">No file loaded</div>
+      </div>
+      <div class="model-tag" id="modelTag">llama-3.3-70b-versatile</div>
+    </div>
+
+    <div class="chat-window" id="chatWindow">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🤖</div>
+        <h2>Ready to analyse your data</h2>
+        <p>Upload a CSV file and connect your Groq API key in the sidebar. Then ask anything about your data in plain English.</p>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <div class="input-row">
+        <textarea class="chat-input" id="chatInput" rows="1"
+          placeholder="Ask anything about your CSV data…" disabled></textarea>
+        <button class="send-btn" id="sendBtn" disabled title="Send">➤</button>
+      </div>
+      <div class="input-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+  // ── STATE ──
+  let csvData = null;
+  let csvText = '';
+  let csvColumns = [];
+  let csvRows = [];
+  let isConnected = false;
+  let isLoading = false;
+  let conversationHistory = [];
+
+  // ── ELEMENTS ──
+  const apiKeyEl = document.getElementById('apiKey');
+  const modelSelectEl = document.getElementById('modelSelect');
+  const uploadZoneEl = document.getElementById('uploadZone');
+  const csvFileEl = document.getElementById('csvFile');
+  const fileInfoEl = document.getElementById('fileInfo');
+  const fileNameEl = document.getElementById('fileName');
+  const fileRemoveEl = document.getElementById('fileRemove');
+  const previewBoxEl = document.getElementById('previewBox');
+  const connectBtnEl = document.getElementById('connectBtn');
+  const statusBadgeEl = document.getElementById('statusBadge');
+  const statusTextEl = document.getElementById('statusText');
+  const chatWindowEl = document.getElementById('chatWindow');
+  const emptyStateEl = document.getElementById('emptyState');
+  const chatInputEl = document.getElementById('chatInput');
+  const sendBtnEl = document.getElementById('sendBtn');
+  const topbarSubEl = document.getElementById('topbarSub');
+  const modelTagEl = document.getElementById('modelTag');
+  const quickPromptsEl = document.getElementById('quickPrompts');
+
+  // ── FILE HANDLING ──
+  function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    const parse = line => {
+      const result = []; let cur = ''; let inQ = false;
+      for (let ch of line) {
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+        else cur += ch;
+      }
+      result.push(cur.trim());
+      return result;
+    };
+    const headers = parse(lines[0]);
+    const rows = lines.slice(1).map(parse).filter(r => r.some(c => c));
+    return { headers, rows };
+  }
+
+  function renderPreview(headers, rows) {
+    const previewRows = rows.slice(0, 5);
+    const thead = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+    const tbody = previewRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+    previewBoxEl.innerHTML = `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    previewBoxEl.style.display = 'block';
+  }
+
+  function loadFile(file) {
+    if (!file || !file.name.endsWith('.csv')) {
+      alert('Please upload a valid CSV file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      csvText = e.target.result;
+      const parsed = parseCSV(csvText);
+      csvColumns = parsed.headers;
+      csvRows = parsed.rows;
+      fileNameEl.textContent = file.name;
+      fileInfoEl.style.display = 'flex';
+      uploadZoneEl.style.display = 'none';
+      renderPreview(csvColumns, csvRows);
+      topbarSubEl.textContent = `${file.name} · ${csvRows.length} rows · ${csvColumns.length} cols`;
+      checkReady();
+    };
+    reader.readAsText(file);
+  }
+
+  csvFileEl.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+  uploadZoneEl.addEventListener('dragover', e => { e.preventDefault(); uploadZoneEl.classList.add('drag-over'); });
+  uploadZoneEl.addEventListener('dragleave', () => uploadZoneEl.classList.remove('drag-over'));
+  uploadZoneEl.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZoneEl.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+
+  fileRemoveEl.addEventListener('click', () => {
+    csvText = ''; csvColumns = []; csvRows = [];
+    fileInfoEl.style.display = 'none';
+    uploadZoneEl.style.display = 'block';
+    previewBoxEl.style.display = 'none';
+    previewBoxEl.innerHTML = '';
+    csvFileEl.value = '';
+    topbarSubEl.textContent = 'No file loaded';
+    isConnected = false;
+    updateConnectionUI();
+    checkReady();
+  });
+
+  // ── VALIDATION ──
+  function checkReady() {
+    const hasKey = apiKeyEl.value.trim().length > 10;
+    const hasCSV = csvText.length > 0;
+    connectBtnEl.disabled = !(hasKey && hasCSV);
+  }
+
+  apiKeyEl.addEventListener('input', checkReady);
+  modelSelectEl.addEventListener('change', () => {
+    modelTagEl.textContent = modelSelectEl.value;
+  });
+
+  // ── CONNECT ──
+  connectBtnEl.addEventListener('click', () => {
+    isConnected = true;
+    conversationHistory = [];
+    updateConnectionUI();
+    chatWindowEl.innerHTML = '';
+    emptyStateEl.style.display = 'none';
+    chatInputEl.disabled = false;
+    sendBtnEl.disabled = false;
+    chatInputEl.focus();
+    appendMessage('ai', `✅ Connected! I've loaded your CSV with **${csvRows.length} rows** and **${csvColumns.length} columns**.\n\nColumns: \`${csvColumns.join('`, `')}\`\n\nAsk me anything about your data!`);
+  });
+
+  function updateConnectionUI() {
+    if (isConnected) {
+      statusBadgeEl.classList.add('connected');
+      statusTextEl.textContent = `Connected · ${modelSelectEl.value}`;
+    } else {
+      statusBadgeEl.classList.remove('connected');
+      statusTextEl.textContent = 'Not connected — upload CSV & enter API key';
+      chatInputEl.disabled = true;
+      sendBtnEl.disabled = true;
+    }
+  }
+
+  // ── CHAT ──
+  function appendMessage(role, text) {
+    emptyStateEl.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.className = `message ${role}`;
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = role === 'user' ? '🧑' : '🤖';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = formatMessage(text);
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    chatWindowEl.appendChild(msg);
+    chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
+    return bubble;
+  }
+
+  function formatMessage(text) {
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => `<pre>${escHtml(code.trim())}</pre>`);
+    text = text.replace(/\n/g, '<br/>');
+    return text;
+  }
+
+  function escHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function showThinking() {
+    const msg = document.createElement('div');
+    msg.className = 'message ai';
+    msg.id = 'thinkingMsg';
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '🤖';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = `<div class="thinking"><span></span><span></span><span></span></div>`;
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    chatWindowEl.appendChild(msg);
+    chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
+  }
+
+  function removeThinking() {
+    const el = document.getElementById('thinkingMsg');
+    if (el) el.remove();
+  }
+
+  async function sendMessage() {
+    const text = chatInputEl.value.trim();
+    if (!text || isLoading || !isConnected) return;
+    chatInputEl.value = '';
+    chatInputEl.style.height = 'auto';
+    isLoading = true;
+    sendBtnEl.disabled = true;
+    chatInputEl.disabled = true;
+    appendMessage('user', text);
+    showThinking();
+
+    const csvPreview = buildCSVContext();
+    const systemPrompt = `You are a helpful CSV data analyst. The user has uploaded a CSV file.
+
+CSV COLUMN NAMES: ${csvColumns.join(', ')}
+TOTAL ROWS: ${csvRows.length}
+
+CSV DATA (first 50 rows for reference):
+${csvPreview}
+
+Answer questions about this data directly and clearly. When showing tables, use plain text format. When doing calculations, show the result. Be concise and helpful. If asked to create charts or graphs, describe what the chart would look like instead, since you cannot render visuals directly.`;
+
+    conversationHistory.push({ role: 'user', content: text });
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKeyEl.value.trim()}`
+        },
+        body: JSON.stringify({
+          model: modelSelectEl.value,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory
+          ],
+          temperature: 0,
+          max_tokens: 2048
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        const errMsg = data?.error?.message || 'Unknown API error';
+        removeThinking();
+        appendErrorMessage(errMsg);
+        conversationHistory.pop();
+      } else {
+        const reply = data.choices?.[0]?.message?.content || 'No response.';
+        removeThinking();
+        appendMessage('ai', reply);
+        conversationHistory.push({ role: 'assistant', content: reply });
+      }
+    } catch (err) {
+      removeThinking();
+      appendErrorMessage(`Network error: ${err.message}`);
+    }
+
+    isLoading = false;
+    sendBtnEl.disabled = false;
+    chatInputEl.disabled = false;
+    chatInputEl.focus();
+  }
+
+  function appendErrorMessage(msg) {
+    const div = document.createElement('div');
+    div.className = 'error-msg';
+    div.textContent = '⚠️ ' + msg;
+    chatWindowEl.appendChild(div);
+    chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
+  }
+
+  function buildCSVContext() {
+    const MAX_ROWS = 50;
+    const rows = csvRows.slice(0, MAX_ROWS);
+    const header = csvColumns.join(',');
+    const body = rows.map(r => r.join(',')).join('\n');
+    return header + '\n' + body;
+  }
+
+  chatInputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  chatInputEl.addEventListener('input', () => {
+    chatInputEl.style.height = 'auto';
+    chatInputEl.style.height = Math.min(chatInputEl.scrollHeight, 120) + 'px';
+  });
+
+  sendBtnEl.addEventListener('click', sendMessage);
+
+  quickPromptsEl.querySelectorAll('.quick-prompt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!isConnected) return;
+      chatInputEl.value = btn.textContent.replace(/^[^\s]+\s/, '');
+      chatInputEl.focus();
+      sendMessage();
+    });
+  });
+</script>
+</body>
+</html>
